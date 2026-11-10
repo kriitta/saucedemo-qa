@@ -1,8 +1,8 @@
 # Regression Test Scope — After Fixing BUG-002
 
 ## สถานการณ์
-Dev แก้ไข BUG-002 (ปุ่ม Remove ในหน้า Cart ไม่ทำงานสำหรับ error_user) 
-โดยแก้ event handler ของปุ่ม Remove ในหน้า Cart
+Dev แก้ไข BUG-002 (ปุ่ม Remove ในหน้า Products ไม่ทำงานสำหรับ error_user) 
+โดยแก้ event handler ของปุ่ม Remove ในหน้า Products
 
 ## Impact Analysis
 
