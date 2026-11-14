@@ -1,2 +1,6 @@
-cypress/screenshots/
-cypress/videos/
+node_modules/
+test-results/
+playwright-report/
+**/cypress/screenshots/
+**/cypress/videos/
+.DS_Store
