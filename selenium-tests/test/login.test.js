@@ -1,4 +1,5 @@
 const { Builder, By, until } = require('selenium-webdriver');
+const { newDriver } = require('../lib/helpers');
 const assert = require('assert');
 
 const BASE = 'https://www.saucedemo.com';
@@ -9,7 +10,7 @@ describe('Login', function () {
 
   // เปิด browser ใหม่ทุกเคสเพื่อให้เคสแยกอิสระต่อกัน
   beforeEach(async function () {
-    driver = await new Builder().forBrowser('chrome').build();
+    driver = await newDriver();
   });
 
   afterEach(async function () {

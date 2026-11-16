@@ -4,7 +4,12 @@ const BASE = 'https://www.saucedemo.com';
 const TIMEOUT = 5000;
 
 async function newDriver() {
-  return new Builder().forBrowser('chrome').build();
+  const chrome = require('selenium-webdriver/chrome');
+  const options = new chrome.Options();
+  if (process.env.CI) {
+    options.addArguments('--headless=new', '--no-sandbox', '--disable-dev-shm-usage', '--window-size=1920,1080');
+  }
+  return new Builder().forBrowser('chrome').setChromeOptions(options).build();
 }
 
 // เปิด browser ใหม่ก่อนทุกเคส ปิดหลังจบทุกเคส (ต้องเรียกภายใน describe)
@@ -14,7 +19,26 @@ function setupDriver() {
     holder.driver = await newDriver();
   });
   afterEach(async function () {
-    if (holder.driver) await holder.driver.quit();
+    if (!holder.driver) return;
+    if (this.currentTest && this.currentTest.state === 'failed') {
+      try {
+        const fs = require('fs');
+        fs.mkdirSync('failures', { recursive: true });
+        const name = this.currentTest.title.replace(/[^\w-]+/g, '_').slice(0, 60);
+        fs.writeFileSync(`failures/${name}.png`, await holder.driver.takeScreenshot(), 'base64');
+        console.log('    URL ตอนล้ม:', await holder.driver.getCurrentUrl());
+        console.log('    สถานะ focus ตอนล้ม:', JSON.stringify(await holder.driver.executeScript(
+          'return { hasFocus: document.hasFocus(), active: document.activeElement && (document.activeElement.getAttribute("data-test") || document.activeElement.tagName) };')));
+        const errs = await holder.driver.findElements(By.css('[data-test="error"]'));
+        if (errs.length) console.log('    ข้อความ error บนหน้า:', await errs[0].getText());
+        for (const input of await holder.driver.findElements(By.css('input'))) {
+          console.log('    ช่อง', await input.getAttribute('data-test'), '=', JSON.stringify(await input.getAttribute('value')));
+        }
+      } catch (e) {
+        // ขั้นเก็บหลักฐานต้องไม่ทำให้เทสต์พังซ้ำ
+      }
+    }
+    await holder.driver.quit();
   });
   return holder;
 }
@@ -26,13 +50,53 @@ async function waitFor(driver, css) {
 }
 
 async function click(driver, css) {
-  const el = await waitFor(driver, css);
-  await el.click();
+  await driver.wait(async () => {
+    try {
+      const el = await driver.findElement(By.css(css));
+      if (!(await el.isDisplayed())) return false;
+      await el.click();
+      return true;
+    } catch (e) {
+      if (['StaleElementReferenceError', 'NoSuchElementError', 'ElementClickInterceptedError', 'ElementNotInteractableError'].includes(e.name)) return false;
+      throw e;
+    }
+  }, TIMEOUT, `กด ${css} ไม่สำเร็จภายในเวลาที่กำหนด`);
 }
 
 async function type(driver, css, text) {
-  const el = await waitFor(driver, css);
-  await el.sendKeys(text);
+  let last = null;
+  let stage = 'ไม่เจอ element';
+  try {
+    await driver.wait(async () => {
+      try {
+        const el = await driver.findElement(By.css(css));
+        if (!(await el.isDisplayed())) { stage = 'element ไม่แสดง'; return false; }
+        last = await el.getAttribute('value');
+        if (last === text) return true;
+        if (last) await el.clear();
+        await el.click();
+        await driver.executeScript('arguments[0].focus();', el);
+        const focused = await driver.executeScript(
+          'return document.activeElement === arguments[0];', el);
+        if (!focused) { stage = 'คลิกและสั่ง focus แล้วแต่ช่องไม่ได้ focus'; return false; }
+        await el.sendKeys(text);
+        last = await el.getAttribute('value');
+        stage = 'พิมพ์แล้วแต่ค่าในช่องไม่ตรง';
+        return last === text;
+      } catch (e) {
+        if (['StaleElementReferenceError', 'NoSuchElementError', 'ElementClickInterceptedError', 'ElementNotInteractableError'].includes(e.name)) {
+          stage = 'เกิด ' + e.name;
+          return false;
+        }
+        throw e;
+      }
+    }, TIMEOUT);
+  } catch (e) {
+    if (e.name === 'TimeoutError') {
+      throw new Error(`พิมพ์ลง ${css} ไม่สำเร็จ ขั้นที่ค้าง: ${stage} (ค่าล่าสุดในช่อง: ${JSON.stringify(last)})`);
+    }
+    throw e;
+  }
 }
 
 // Selenium ไม่ retry ให้เอง จึงต้องเขียนลูปรอเองทุกครั้งที่ตรวจค่าที่อาจยังไม่พร้อม
@@ -77,6 +141,6 @@ async function fillCheckoutInfo(driver, first, last, zip) {
 }
 
 module.exports = {
-  By, until, setupDriver, waitFor, click, type,
+  By, until, newDriver, setupDriver, waitFor, click, type,
   waitForCount, waitForText, login, addBackpackAndOpenCart, fillCheckoutInfo,
 };

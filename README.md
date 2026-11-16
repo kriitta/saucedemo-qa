@@ -1,5 +1,7 @@
 # SauceDemo QA: manual testing to multi-tool automation
 
+[![Tests](https://github.com/kriitta/saucedemo-qa/actions/workflows/tests.yml/badge.svg)](https://github.com/kriitta/saucedemo-qa/actions/workflows/tests.yml)
+
 A self-directed QA practice project on the public demo shop [saucedemo.com](https://www.saucedemo.com).
 It covers the test process end to end (planning, design, execution, defect reporting, UAT, regression scope)
 and automates the same flows with three tools to compare them first-hand.
